@@ -2,15 +2,13 @@
  * Render parameter serialization — converts MandHeader to Float64Array/Uint32Array
  * for passing to the WASM module.
  *
- * This bridges the TypeScript MandHeader state to the Rust RenderParams struct.
+ * This bridges the JavaScript MandHeader state to the Rust RenderParams struct.
  */
-
-import type { MandHeader } from './header.js';
 
 /**
  * Formula name → numeric ID mapping (must match formula_id_from_u32 in lib.rs).
  */
-const FORMULA_NAME_TO_ID: Record<string, number> = {
+const FORMULA_NAME_TO_ID = {
   '(none)': 0,
   'Mandelbulb Power 2': 1,
   'Mandelbulb Power 8': 2,
@@ -24,11 +22,26 @@ const FORMULA_NAME_TO_ID: Record<string, number> = {
   'Aexion C': 10,
 };
 
-const HYBRID_MODE_TO_ID: Record<string, number> = {
+const HYBRID_MODE_TO_ID = {
   'alternating': 0,
   'interpolated': 1,
   '4d': 2,
 };
+
+/**
+ * Parse "#RRGGBB" to [r, g, b] as floats in [0, 1].
+ * @param {string} hex
+ * @returns {number[]}
+ */
+export function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  if (h.length < 6) return [0, 0, 0];
+  return [
+    parseInt(h.substring(0, 2), 16) / 255,
+    parseInt(h.substring(2, 4), 16) / 255,
+    parseInt(h.substring(4, 6), 16) / 255,
+  ];
+}
 
 /**
  * Build the render_params Float64Array for the WASM render_scanlines call.
@@ -52,31 +65,26 @@ const HYBRID_MODE_TO_ID: Record<string, number> = {
  * [25-27] cut_normal (x, y, z)
  * [28] cut_d
  * [29] bin_search_steps
+ *
+ * @param {object} header - MandHeader object
+ * @returns {Float64Array}
  */
-export function buildRenderParams(header: MandHeader): Float64Array {
+export function buildRenderParams(header) {
   const params = new Float64Array(30);
-
-  // Compute camera setup from header
-  // The rotation matrix is row-major: [r00, r01, r02, r10, r11, r12, r20, r21, r22]
   const r = header.rotation;
 
-  // Camera position from header
   params[0] = header.width;
   params[1] = header.height;
   params[2] = header.posX;
   params[3] = header.posY;
   params[4] = header.posZ;
 
-  // Camera faces along the Z column of the rotation matrix, offset by zoom
   // Base ray direction (center of screen → forward direction)
-  const fwd_x = r[2];
-  const fwd_y = r[5];
-  const fwd_z = r[8];
-  params[5] = fwd_x;
-  params[6] = fwd_y;
-  params[7] = fwd_z;
+  params[5] = r[2];
+  params[6] = r[5];
+  params[7] = r[8];
 
-  // Per-pixel steps in world space: right and up vectors scaled by FOV/aspect
+  // Per-pixel steps in world space
   const aspect = header.width / header.height;
   const fovScale = header.fov > 0 ? Math.tan(header.fov * 0.5) : 0.5;
 
@@ -85,18 +93,17 @@ export function buildRenderParams(header: MandHeader): Float64Array {
   params[9] = r[3] * fovScale * aspect;
   params[10] = r[6] * fovScale * aspect;
 
-  // Up vector (Y column of rotation matrix, negated for screen coords)
+  // Up vector (Y column, negated for screen coords)
   params[11] = -r[1] * fovScale;
   params[12] = -r[4] * fovScale;
   params[13] = -r[7] * fovScale;
 
-  // Rendering parameters
   params[14] = header.deStop;
   params[15] = header.stepWidth;
-  params[16] = 50.0;  // max ray length
+  params[16] = 50.0;
   params[17] = header.iterations;
-  params[18] = 16.0;  // bailout
-  params[19] = header.fov > 0 ? header.fov * 0.001 : 0.0;  // FOV factor for DE scaling
+  params[18] = 16.0;
+  params[19] = header.fov > 0 ? header.fov * 0.001 : 0.0;
   params[20] = header.julia ? 1.0 : 0.0;
   params[21] = header.juliaX;
   params[22] = header.juliaY;
@@ -106,7 +113,7 @@ export function buildRenderParams(header: MandHeader): Float64Array {
   params[26] = header.cutPlaneNormal[1];
   params[27] = header.cutPlaneNormal[2];
   params[28] = header.cutPlaneDistance;
-  params[29] = 3.0;   // binary search steps
+  params[29] = 3.0;
 
   return params;
 }
@@ -115,17 +122,20 @@ export function buildRenderParams(header: MandHeader): Float64Array {
  * Build the formula_ids Uint32Array for the WASM render_scanlines call.
  *
  * Layout: [num_slots, id1, iters1, id2, iters2, ..., hybrid_mode]
+ *
+ * @param {object} header - MandHeader object
+ * @returns {Uint32Array}
  */
-export function buildFormulaIds(header: MandHeader): Uint32Array {
-  const activeSlots = header.formulaSlots.filter(s => s.name && s.name !== '(none)' && s.name !== '');
+export function buildFormulaIds(header) {
+  const activeSlots = header.formulaSlots.filter(
+    (s) => s.name && s.name !== '(none)' && s.name !== ''
+  );
   const numSlots = activeSlots.length || 1;
 
-  // +1 for count, +2 per slot (id, iters), +1 for hybrid mode
   const arr = new Uint32Array(1 + numSlots * 2 + 1);
   arr[0] = numSlots;
 
   if (activeSlots.length === 0) {
-    // Default to Mandelbulb Power 8
     arr[1] = 2; // MandelbulbPower8
     arr[2] = 1;
     arr[3] = 0; // alternating
@@ -145,77 +155,60 @@ export function buildFormulaIds(header: MandHeader): Uint32Array {
 /**
  * Build the paint_params Float64Array for the WASM paint_gbuffer call.
  *
- * Layout: [num_lights,
- *   per light: [dir_x, dir_y, dir_z, col_r, col_g, col_b, amplitude, spec_size, spec_intensity],
- *   ambient_r, ambient_g, ambient_b, ambient_intensity,
- *   fog_density, fog_r, fog_g, fog_b,
- *   bg_r, bg_g, bg_b,
- *   view_dir_x, view_dir_y, view_dir_z,
- *   ao_strength,
- *   num_gradient_stops,
- *   per stop: [position, r, g, b]]
+ * @param {object} header - MandHeader object
+ * @returns {Float64Array}
  */
-export function buildPaintParams(header: MandHeader): Float64Array {
-  const lights = header.lighting.lights.filter(l => l.amplitude > 0.001);
+export function buildPaintParams(header) {
+  const lights = header.lighting.lights.filter((l) => l.amplitude > 0.001);
   const numLights = lights.length;
   const numStops = header.lighting.surfaceColors.length;
 
-  // Calculate total size
   const size = 1 + numLights * 9 + 4 + 4 + 3 + 3 + 1 + 1 + numStops * 4;
   const params = new Float64Array(size);
   let idx = 0;
 
-  // Lights
   params[idx++] = numLights;
   for (const light of lights) {
-    // Convert spherical (theta, phi) to Cartesian direction
     const st = Math.sin(light.theta);
     const ct = Math.cos(light.theta);
     const sp = Math.sin(light.phi);
     const cp = Math.cos(light.phi);
-    params[idx++] = st * cp;   // dir_x
-    params[idx++] = st * sp;   // dir_y
-    params[idx++] = ct;        // dir_z
+    params[idx++] = st * cp;
+    params[idx++] = st * sp;
+    params[idx++] = ct;
 
-    // Parse hex color
     const [cr, cg, cb] = hexToRgb(light.color);
     params[idx++] = cr;
     params[idx++] = cg;
     params[idx++] = cb;
     params[idx++] = light.amplitude;
-    params[idx++] = light.specularSize * 64.0; // Map 0-1 to exponent range
-    params[idx++] = 0.5; // specular intensity
+    params[idx++] = light.specularSize * 64.0;
+    params[idx++] = 0.5;
   }
 
-  // Ambient
   const [ar, ag, ab] = hexToRgb(header.lighting.ambientColor);
   params[idx++] = ar;
   params[idx++] = ag;
   params[idx++] = ab;
   params[idx++] = header.lighting.ambientIntensity;
 
-  // Fog
   params[idx++] = header.lighting.fogDensity;
   const [fr, fg, fb] = hexToRgb(header.lighting.fogColor);
   params[idx++] = fr;
   params[idx++] = fg;
   params[idx++] = fb;
 
-  // Background
   params[idx++] = 0.02;
   params[idx++] = 0.02;
   params[idx++] = 0.05;
 
-  // View direction (forward Z in default view)
   const r = header.rotation;
   params[idx++] = r[2];
   params[idx++] = r[5];
   params[idx++] = r[8];
 
-  // AO strength
   params[idx++] = 0.5;
 
-  // Gradient stops
   params[idx++] = numStops;
   for (const stop of header.lighting.surfaceColors) {
     params[idx++] = stop.position;
@@ -226,15 +219,4 @@ export function buildPaintParams(header: MandHeader): Float64Array {
   }
 
   return params;
-}
-
-/** Parse "#RRGGBB" to [r, g, b] as floats in [0, 1]. */
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace('#', '');
-  if (h.length < 6) return [0, 0, 0];
-  return [
-    parseInt(h.substring(0, 2), 16) / 255,
-    parseInt(h.substring(2, 4), 16) / 255,
-    parseInt(h.substring(4, 6), 16) / 255,
-  ];
 }

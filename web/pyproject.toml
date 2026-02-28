@@ -1,0 +1,57 @@
+[project]
+name = "mb3d-web"
+version = "0.1.0"
+description = "Mandelbulb3D Web — pure-JS fractal viewer with Rust/WASM engine"
+requires-python = ">=3.10"
+
+[project.scripts]
+build = "build:main"
+serve = "build:serve"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = [".", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # isort
+  "N",   # pep8-naming
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
+  "S",   # flake8-bandit
+  "T20", # flake8-print
+  "SIM", # flake8-simplify
+  "RUF", # ruff-specific
+]
+ignore = ["S603", "S607", "S101", "T201", "RUF012"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "--strict-markers -v"
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+  "tests/*",
+  "src/wasm/*",
+  ".github/*",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__",
+  "raise NotImplementedError",
+]

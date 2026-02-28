@@ -1,7 +1,14 @@
-node_modules/
-dist/
 src/wasm/target/
 src/wasm/pkg/
+dist/
+.vite/
 *.swp
 *.swo
 .DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+*.egg-info/
