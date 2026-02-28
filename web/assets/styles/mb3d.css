@@ -1,0 +1,29 @@
+:root {
+  --mb3d-bg: #1e1e1e;
+  --mb3d-surface: #2d2d2d;
+  --mb3d-border: #404040;
+  --mb3d-accent: #4a9eff;
+  --mb3d-text: #e0e0e0;
+  --mb3d-text-dim: #888;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--mb3d-bg);
+  color: var(--mb3d-text);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--mb3d-bg); }
+::-webkit-scrollbar-thumb { background: var(--mb3d-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mb3d-accent); }

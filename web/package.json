@@ -1,0 +1,22 @@
+{
+  "name": "mb3d-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build:wasm": "cd src/wasm && wasm-pack build --target web --release --out-dir ../wasm/pkg",
+    "build:wasm:dev": "cd src/wasm && wasm-pack build --target web --dev --out-dir ../wasm/pkg",
+    "build": "npm run build:wasm && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:wasm": "cd src/wasm && wasm-pack test --headless --chrome"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.4.0",
+    "vite-plugin-wasm": "^3.3.0",
+    "vite-plugin-top-level-await": "^1.4.0",
+    "vitest": "^2.0.0"
+  }
+}

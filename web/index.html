@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mandelbulb3D Web</title>
+  <link rel="stylesheet" href="./assets/styles/mb3d.css" />
+</head>
+<body>
+  <mb3d-app>
+    <!-- Viewport slots -->
+    <mb3d-viewer slot="viewer" width="800" height="600"></mb3d-viewer>
+    <mb3d-navigator slot="navigator"></mb3d-navigator>
+
+    <!-- Sidebar slots -->
+    <mb3d-controls slot="controls"></mb3d-controls>
+    <mb3d-formula-panel slot="formulas"></mb3d-formula-panel>
+    <mb3d-light-editor slot="lighting"></mb3d-light-editor>
+    <mb3d-color-picker slot="color"></mb3d-color-picker>
+  </mb3d-app>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
